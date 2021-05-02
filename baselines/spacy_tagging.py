@@ -21,6 +21,8 @@ import spacy
 sys.path.append('../evaluation')
 import semeval2021
 import fix_spans
+from spacy.tokens import Doc
+from spacy.training import Example
 
 def spans_to_ents(doc, spans, label):
   """Converts span indicies into spacy entity labels."""
@@ -77,7 +79,7 @@ def main():
   toxic_tagging = spacy.blank('en')
   toxic_tagging.vocab.strings.add('TOXIC')
   ner = nlp.create_pipe("ner")
-  toxic_tagging.add_pipe(ner, last=True)
+  toxic_tagging.add_pipe("ner")
   ner.add_label('TOXIC')
 
   pipe_exceptions = ["ner", "trf_wordpiecer", "trf_tok2vec"]
@@ -95,8 +97,12 @@ def main():
           training_data, size=spacy.util.compounding(
               4.0, 32.0, 1.001))
       for batch in batches:
-        texts, annotations = zip(*batch)
-        toxic_tagging.update(texts, annotations, drop=0.5, losses=losses)
+        for text, annotations in batch:
+          doc = toxic_tagging.make_doc(text)
+          example = Example.from_dict(doc, annotations)
+
+
+          toxic_tagging.update([example], drop=0.5, losses=losses)
       print("Losses", losses)
 
   # Score on trial data.
